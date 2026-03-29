@@ -290,7 +290,7 @@ class User extends BaseController
 				$email->setSubject('Password Reset Request');
 				$email->setFrom('mintlypersonalfinancetracker@gmail.com', 'Personal Finance Tracker - Mintly Team');
 				// create password reset link
-				$resetLink = base_url('reset-password?token=' . $token);
+				$resetLink = base_url('view/public/reset-password?token=' . $token);
 				$emailContent = "<p>Dear user,</p>"
 					. "<p>You have requested to reset your password. Please click the link below to reset your password:</p>"
 					. "<p><a href='" . $resetLink . "'>Reset Password</a></p>"

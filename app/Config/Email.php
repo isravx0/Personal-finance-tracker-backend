@@ -4,10 +4,9 @@ namespace Config;
 
 use CodeIgniter\Config\BaseConfig;
 
-class Email extends BaseConfig
-{
-    public string $fromEmail  = 'mintlypersonalfinancetracker@gmail.com';
-    public string $fromName   = 'Personal Finance Tracker - Mintly';
+class Email extends BaseConfig {
+    public string $fromEmail  = '';
+    public string $fromName   = '';
     public string $recipients = '';
 
     /**
@@ -18,7 +17,7 @@ class Email extends BaseConfig
     /**
      * The mail sending protocol: mail, sendmail, smtp
      */
-    public string $protocol = 'smtp';
+    public string $protocol = '';
 
     /**
      * The server path to Sendmail.
@@ -28,22 +27,22 @@ class Email extends BaseConfig
     /**
      * SMTP Server Hostname
      */
-    public string $SMTPHost = 'smtp.gmail.com';
+    public string $SMTPHost = '';
 
     /**
      * Which SMTP authentication method to use: login, plain
-     */
+        */
     public string $SMTPAuthMethod = 'login';
 
     /**
      * SMTP Username
      */
-    public string $SMTPUser = 'mintlypersonalfinancetracker@gmail.com';
+    public string $SMTPUser = '';
 
     /**
      * SMTP Password
      */
-    public string $SMTPPass = 'xllf ngbh xcam qqbp';
+    public string $SMTPPass = '';
 
     /**
      * SMTP Port

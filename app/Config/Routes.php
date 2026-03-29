@@ -6,13 +6,12 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 
-// CORS preflight requests - must be first
+// CORS preflight
 $routes->options('(:any)', static function () {
     return;
 });
 
-// Apply CORS filter globally
-$routes->setAutoRoute(true, ['filter' => 'cors']);
-
+// frontend entry
 $routes->get('/', 'View::index');
-$routes->get('/view/*', 'View::index');
+$routes->get('view/(:any)', 'View::index');
+$routes->get('(:any)', 'View::index');
