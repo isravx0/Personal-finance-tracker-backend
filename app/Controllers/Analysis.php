@@ -12,73 +12,73 @@ class Analysis extends BaseController
 		$this->Model = new Analyses();
 	}
 
-	public function analyze()
-	{
+	public function analyze() {
 		$data = $this->request->getJSON(true);
 		$status = false;
 		$message = '';
 
-		if (!isset($data) || !is_array($data) || empty($data)) {
-			return $this->response->setJSON([
-				'success' => false,
-				'message' => 'Invalid data'
-			])->setStatusCode(400);
+		// check if data isset
+		if ($status = isset($data) && !is_array($data) && empty($data)) {
+			// load validation 
+			$validation = \Config\Services::validation();
+			// set rules
+			$validation->setRules([
+				'monthly_income' => 'required|decimal',
+				'rent' => 'permit_empty|decimal',
+				'food' => 'permit_empty|decimal',
+				'transport' => 'permit_empty|decimal',
+				'bills' => 'permit_empty|decimal',
+				'entertainment' => 'permit_empty|decimal',
+				'other_expenses' => 'permit_empty|decimal',
+				'target_savings' => 'permit_empty|decimal',
+			]);
+
+			// check if data is valid
+			if ($status = $validation->run($data)) {
+				//  set data
+				$monthlyIncome = $data['monthly_income'] ?? 0;
+				$rent = $data['rent'] ?? 0;
+				$food = $data['food'] ?? 0;
+				$transport = $data['transport'] ?? 0;
+				$bills = $data['bills'] ?? 0;
+				$entertainment = $data['entertainment'] ?? 0;
+				$otherExpenses = $data['other_expenses'] ?? 0;
+				$targetSavings = $data['target_savings'] ?? 0;
+
+				// calculate total expenses, remaining balance and actual savings
+				$totalExpenses = $rent + $food + $transport + $bills + $entertainment + $otherExpenses;
+				$remainingBalance = $monthlyIncome - $totalExpenses;
+				$actualSavings = $remainingBalance > 0 ? $remainingBalance : 0;
+
+				// generate advice
+				$advice = $this->generateAdvice($monthlyIncome, $totalExpenses, $actualSavings, $targetSavings);
+				// get user id from session
+				$userId = session()->get('id');
+				// save analysis to database
+				$saveData = [
+					'user_id' => isset($userId) ? $userId : null,
+					'monthly_income' => isset($monthlyIncome) ? $monthlyIncome : null,
+					'rent' => isset($rent) ? $rent : null,
+					'food' => isset($food) ? $food : null,
+					'transport' => isset($transport) ? $transport : null,
+					'bills' => isset($bills) ? $bills : null,
+					'entertainment' => isset($entertainment) ? $entertainment : null,
+					'other_expenses' => isset($otherExpenses) ? $otherExpenses : null,
+					'target_savings' => isset($targetSavings) ? $targetSavings : null,
+					'total_expenses' => isset($totalExpenses) ? $totalExpenses : null,
+					'remaining_balance' => isset($remainingBalance) ? $remainingBalance : null,
+					'actual_savings' => isset($actualSavings) ? $actualSavings : null,
+					'advice' => isset($advice) ? $advice : null,
+				];
+
+				$this->Model->insert($saveData);
+				$message = 'Analysis completed successfully';
+			} else {
+				$message =  $validation->getErrors();
+			}
+		} else {
+			$message = 'Invalid data';
 		}
-
-		$validation = \Config\Services::validation();
-		$validation->setRules([
-			'monthly_income' => 'required|decimal',
-			'rent' => 'permit_empty|decimal',
-			'food' => 'permit_empty|decimal',
-			'transport' => 'permit_empty|decimal',
-			'bills' => 'permit_empty|decimal',
-			'entertainment' => 'permit_empty|decimal',
-			'other_expenses' => 'permit_empty|decimal',
-			'target_savings' => 'permit_empty|decimal',
-		]);
-
-		if (!$validation->run($data)) {
-			return $this->response->setJSON([
-				'success' => false,
-				'message' => $validation->getErrors()
-			])->setStatusCode(400);
-		}
-
-		$monthlyIncome = (float) ($data['monthly_income'] ?? 0);
-		$rent = (float) ($data['rent'] ?? 0);
-		$food = (float) ($data['food'] ?? 0);
-		$transport = (float) ($data['transport'] ?? 0);
-		$bills = (float) ($data['bills'] ?? 0);
-		$entertainment = (float) ($data['entertainment'] ?? 0);
-		$otherExpenses = (float) ($data['other_expenses'] ?? 0);
-		$targetSavings = (float) ($data['target_savings'] ?? 0);
-
-		$totalExpenses = $rent + $food + $transport + $bills + $entertainment + $otherExpenses;
-		$remainingBalance = $monthlyIncome - $totalExpenses;
-		$actualSavings = $remainingBalance > 0 ? $remainingBalance : 0;
-
-		$advice = $this->generateAdvice($monthlyIncome, $totalExpenses, $actualSavings, $targetSavings);
-		$userId = session()->get('id');
-		$saveData = [
-			'id' => isset($userId) ? $userId : null,
-			'monthly_income' => isset($monthlyIncome) ? $monthlyIncome : null,
-			'rent' => isset($rent) ? $rent : null,
-			'food' => isset($food) ? $food : null,
-			'transport' => isset($transport) ? $transport : null,
-			'bills' => isset($bills) ? $bills : null,
-			'entertainment' => isset($entertainment) ? $entertainment : null,
-			'other_expenses' => isset($otherExpenses) ? $otherExpenses : null,
-			'target_savings' => isset($targetSavings) ? $targetSavings : null,
-			'total_expenses' => isset($totalExpenses) ? $totalExpenses : null,
-			'remaining_balance' => isset($remainingBalance) ? $remainingBalance : null,
-			'actual_savings' => isset($actualSavings) ? $actualSavings : null,
-			'advice' => isset($advice) ? $advice : null,
-		];
-
-		$this->Model->insert($saveData);
-
-		$status = true;
-		$message = 'Analysis completed successfully';
 
 		return $this->response->setJSON([
 			'success' => $status,
@@ -87,8 +87,7 @@ class Analysis extends BaseController
 		])->setStatusCode(200);
 	}
 
-	private function generateAdvice($income, $expenses, $actualSavings, $targetSavings)
-	{
+	private function generateAdvice($income, $expenses, $actualSavings, $targetSavings) {
 		if ($income <= 0) {
 			return 'Please enter a valid monthly income.';
 		}
@@ -113,31 +112,30 @@ class Analysis extends BaseController
 	}
 
 	public function latest() {
+		// initialize variable
+		$status = false;
+		$message = '';
+		$data = [];
+
+		// initialize session and get user id
 		$session = \Config\Services::session();
 		$userId = $session->get('id');
 
-		if (!$userId) {
-			return $this->response->setJSON([
-				'success' => false,
-				'message' => 'Not authenticated'
-			])->setStatusCode(401);
-		}
-
-		$analysis = $this->Model
-			->where('id', $userId)
-			->orderBy('created_at', 'DESC')
-			->first();
-
-		if (!$analysis) {
-			return $this->response->setJSON([
-				'success' => false,
-				'message' => 'No analysis found'
-			]);
+		if ($status = isset($userId) && !empty($userId)) {
+			$data = $this->Model
+				->where('user_id', $userId)
+				->orderBy('created_at', 'DESC')
+				->first();
+			if ($status = isset($data) && !empty($data)) {
+				$message = 'No analysis found for the user';
+			}
+		} else {
+			$message = 'Not authenticated';
 		}
 
 		return $this->response->setJSON([
-			'success' => true,
-			'data' => $analysis
+			'success' => $status,
+			'data' => $data
 		]);
 	}
 
@@ -153,7 +151,7 @@ class Analysis extends BaseController
 		}
 
 		$analyses = $this->Model
-			->where('id', $userId)
+			->where('user_id', $userId)
 			->orderBy('created_at', 'DESC')
 			->findAll();
 
