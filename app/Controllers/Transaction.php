@@ -15,7 +15,7 @@ class Transaction extends ResourceController {
 
 	public function index() {
 		$session = session();
-		$userId = $session->get('user_id');
+		$userId = $session->get('id');
 
 		if (!$userId) {
 			return $this->failUnauthorized('User not logged in');
@@ -25,7 +25,7 @@ class Transaction extends ResourceController {
 		$transactions = $this->Model
 			->select('transactions.*, categories.name as category_name')
 			->join('categories', 'categories.id = transactions.category_id')
-			->where('transactions.user_id', $userId)
+			->where('transactions.id', $userId)
 			->orderBy('transaction_date', 'DESC')
 			->findAll();
 
@@ -34,7 +34,7 @@ class Transaction extends ResourceController {
 
 	public function create() {
 		$session = session();
-		$userId = $session->get('user_id');
+		$userId = $session->get('id');
 
 		if (!$userId) {
 			return $this->failUnauthorized('User not logged in');
@@ -53,7 +53,7 @@ class Transaction extends ResourceController {
 		}
 
 		$data = [
-			'user_id'          => $userId,
+			'id'          => $userId,
 			'category_id'      => $this->request->getPost('category_id'),
 			'type'             => $this->request->getPost('type'),
 			'amount'           => $this->request->getPost('amount'),
@@ -71,7 +71,7 @@ class Transaction extends ResourceController {
 
 	public function update($id = null) {
 		$session = session();
-		$userId = $session->get('user_id');
+		$userId = $session->get('id');
 
 		if (!$userId) {
 			return $this->failUnauthorized('User not logged in');
@@ -79,7 +79,7 @@ class Transaction extends ResourceController {
 
 		$transaction = $this->Model->find($id);
 
-		if (!$transaction || $transaction['user_id'] != $userId) {
+		if (!$transaction || $transaction['id'] != $userId) {
 			return $this->failNotFound('Transaction not found');
 		}
 
@@ -103,7 +103,7 @@ class Transaction extends ResourceController {
 
 	public function delete($id = null) {
 		$session = session();
-		$userId = $session->get('user_id');
+		$userId = $session->get('id');
 
 		if (!$userId) {
 			return $this->failUnauthorized('User not logged in');
@@ -111,7 +111,7 @@ class Transaction extends ResourceController {
 
 		$transaction = $this->Model->find($id);
 
-		if (!$transaction || $transaction['user_id'] != $userId) {
+		if (!$transaction || $transaction['id'] != $userId) {
 			return $this->failNotFound('Transaction not found');
 		}
 

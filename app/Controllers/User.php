@@ -2,17 +2,14 @@
 
 namespace App\Controllers;
 
-class User extends BaseController
-{
+class User extends BaseController {
 
 	// construct function to load model
-	public function __construct()
-	{
-		$this->Users = new \App\Models\Users();
+	public function __construct() {
+		$this->Model = new \App\Models\Users();
 	}
 
-	public function login()
-	{
+	public function login() {
 		// define variables
 		$data = [];
 		$message = '';
@@ -33,18 +30,41 @@ class User extends BaseController
 
 			if ($status = $validation->run($data)) {
 				// check if user exists
-				$user = $this->Users->where('username', $data['username'])->first();
+				$user = $this->Model->where('username', $data['username'])->first();
 				// check if user exists
 				if ($status = isset($user) && is_array($user) && count($user) > 0) {
 					// validate password
 					if ($status = password_verify($data['password'], $user['password'])) {
-						// save user data to session
-						$session = \Config\Services::session();
-						$session->set('user_id', $user['id']);
-						$session->set('user_name', $user['name']);
-						$session->set('user_email', $user['email']);
-						$session->set('user_username', $user['username']);
-						$message = 'User logged in successfully';
+
+					if (!empty($user['two_factor_enabled'])) {
+						$twoFactorSent = $this->twoFactorEmail($user['email']);
+
+						if ($twoFactorSent) {
+							$session = \Config\Services::session();
+							$session->set('pending_2fa_user_id', $user['id']);
+
+							return $this->response->setJSON([
+								'success' => true,
+								'requires_2fa' => true,
+								'message' => '2FA code sent to email',
+							])->setStatusCode(200);
+						} else {
+							return $this->response->setJSON([
+								'success' => false,
+								'message' => 'Failed to send 2FA code'
+							])->setStatusCode(500);
+						}
+					}
+
+					// fallback if 2FA disabled
+					$session = \Config\Services::session();
+					$session->set('id', $user['id']);
+					$session->set('name', $user['name']);
+					$session->set('email', $user['email']);
+					$session->set('username', $user['username']);
+
+					$message = 'User logged in successfully';
+
 					} else {
 						$message = 'Invalid password';
 					}
@@ -71,8 +91,7 @@ class User extends BaseController
 		])->setStatusCode($status ? 200 : 400);
 	}
 
-	public function register()
-	{
+	public function register() {
 		// define variables
 		$data = [];
 		$status = false;
@@ -95,10 +114,10 @@ class User extends BaseController
 
 			if ($status = $validation->run($data)) {
 				// check if user email not already exists
-				$user = $this->Users->where('email', $data['email'])->first();
+				$user = $this->Model->where('email', $data['email'])->first();
 				if (!$status = isset($user) && is_array($user) && count($user) > 0) {
 					// save data to database
-					$this->Users->save([
+					$this->Model->save([
 						'name' => $data['name'],
 						'email' => $data['email'],
 						'username' => $data['username'],
@@ -123,10 +142,9 @@ class User extends BaseController
 		])->setStatusCode($status ? 201 : 400);
 	}
 
-	public function updateProfile()
-	{
+	public function updateProfile() {
 		$session = \Config\Services::session();
-		$userId = $session->get('user_id');
+		$userId = $session->get('id');
 
 		if (!$userId) {
 			return $this->response->setJSON([
@@ -176,7 +194,7 @@ class User extends BaseController
 			$updateData['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
 		}
 
-		$updated = $this->Users->update($userId, $updateData);
+		$updated = $this->Model->update($userId, $updateData);
 
 		if (!$updated) {
 			return $this->response->setJSON([
@@ -186,7 +204,7 @@ class User extends BaseController
 		}
 
 		// refresh session data
-		$updatedUser = $this->Users->find($userId);
+		$updatedUser = $this->Model->find($userId);
 
 		$session->set([
 			'user_name' => $updatedUser['name'],
@@ -206,8 +224,7 @@ class User extends BaseController
 		])->setStatusCode(200);
 	}
 
-	public function logout()
-	{
+	public function logout() {
 		// destroy session
 		$session = \Config\Services::session();
 		$session->destroy();
@@ -219,8 +236,7 @@ class User extends BaseController
 
 	}
 
-	public function forgetPassword()
-	{
+	public function forgetPassword() {
 		// define variables
 		$data = [];
 		$message = '';
@@ -239,7 +255,7 @@ class User extends BaseController
 
 			if ($status = $validation->run($data)) {
 				// check if user exists
-				$user = $this->Users->where('email', $data['email'])->first();
+				$user = $this->Model->where('email', $data['email'])->first();
 				// check if user exists
 				if ($status = isset($user) && is_array($user) && count($user) > 0) {
 					if ($status = $this->sendPasswordResetLink($data['email'])) {
@@ -265,8 +281,7 @@ class User extends BaseController
 	}
 
 	// send password reset link to email
-	private function sendPasswordResetLink($userEmail)
-	{
+	private function sendPasswordResetLink($userEmail){
 		// define variables
 		$status = false;
 
@@ -275,11 +290,11 @@ class User extends BaseController
 			$token = bin2hex(random_bytes(16));
 
 			// save data to database
-			$user = $this->Users->where('email', $userEmail)->first();
+			$user = $this->Model->where('email', $userEmail)->first();
 
 			if ($status = isset($user) && is_array($user) && count($user) > 0 && isset($user['id'])) {
 				// update user with password reset token and expiration time (1 hour)
-				$this->Users->update($user['id'], [
+				$this->Model->update($user['id'], [
 					'password_reset_token' => $token,
 					'password_reset_expires' => date('Y-m-d H:i:s', strtotime('+1 hour')),
 				]);
@@ -308,8 +323,7 @@ class User extends BaseController
 	}
 
 	// reset password
-	public function resetPassword()
-	{
+	public function resetPassword() {
 		// define variables
 		$data = [];
 		$message = '';
@@ -330,13 +344,13 @@ class User extends BaseController
 
 			if ($status = $validation->run($data)) {
 				// check if token is valid and not expired
-				$user = $this->Users->where('password_reset_token', $data['token'])
+				$user = $this->Model->where('password_reset_token', $data['token'])
 					->where('password_reset_expires >=', date('Y-m-d H:i:s'))
 					->first();
 
 				if ($status = isset($user) && is_array($user) && count($user) > 0) {
 					// update user's password
-					$this->Users->update($user['id'], [
+					$this->Model->update($user['id'], [
 						'password' => password_hash($data['password'], PASSWORD_DEFAULT),
 						'password_reset_token' => null,
 						'password_reset_expires' => null,
@@ -359,19 +373,18 @@ class User extends BaseController
 		])->setStatusCode($status ? 200 : 400);
 	}
 
-	public function session()
-	{
+	public function session() {
 		// check if user is logged in
 		$session = \Config\Services::session();
-		if ($session->get('user_id')) {
+		if ($session->get('id')) {
 			return $this->response->setJSON([
 				'success' => true,
 				'message' => 'User is logged in',
 				'user' => [
-					'id' => $session->get('user_id'),
-					'name' => $session->get('user_name'),
-					'email' => $session->get('user_email'),
-					'username' => $session->get('user_username'),
+					'id' => $session->get('id'),
+					'name' => $session->get('name'),
+					'email' => $session->get('email'),
+					'username' => $session->get('username'),
 				],
 			])->setStatusCode(200);
 		} else {
@@ -380,5 +393,140 @@ class User extends BaseController
 				'message' => 'User is not logged in',
 			])->setStatusCode(401);
 		}
+	}
+
+	public function twoFactorEmail($email = null) {
+		// define variables
+		$data = [];
+		$message = '';
+		$status = false;
+
+		//  check if email is set and valid
+		if (isset($email) && is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+			
+			// get user by email
+			$user =$this->Model->where('email', $email)->first();
+
+			if (isset($user) && is_array($user) && count($user) > 0) {
+				// send 2FA code to email
+				$code = (string) rand(100000, 999999);
+				$hashedCode = password_hash($code, PASSWORD_DEFAULT);
+				$expiresAt = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+
+				$this->Model->update($user['id'], [
+					'two_factor_code' => $hashedCode,
+					'two_factor_expires' => $expiresAt,
+				]);
+
+				$emailService = \Config\Services::email();
+				$emailService->setTo($email);
+				$emailService->setSubject('Your 2FA Code');
+				$emailService->setFrom(
+					'mintlypersonalfinancetracker@gmail.com',
+					'Personal Finance Tracker - Mintly Team'
+				);
+
+				$emailContent = "<p>Dear user,</p>"
+					. "<p>Your 2FA code is: <strong>{$code}</strong></p>"
+					. "<p>This code will expire in 10 minutes.</p>"
+					. "<p>If you did not request this, please ignore this email.</p>"
+					. "<p>Best regards,<br>Personal Finance Tracker - Mintly Team</p>";
+
+				$emailService->setMessage($emailContent);
+
+				return $emailService->send();
+			}
+		}
+	}
+
+	public function verifyTwoFactor() {
+		// define variables
+		$status = false;
+		$message = null;
+		$data = [];
+
+		$session = \Config\Services::session();
+		$userId = $session->get('pending_2fa_user_id');
+
+		if ($status = isset($userId) && !empty($userId)) {
+			$data = $this->request->getJSON(true);
+
+			if ($status = isset($data['code']) && !empty($data['code'])) {
+				$user =$this->Model->find($userId);
+
+				if ($status = isset($user) && is_array($user) && count($user) > 0) {
+					if ($status = !(empty($user['two_factor_code']) && empty($user['two_factor_expires']) && strtotime($user['two_factor_expires']) < time())) {
+						if ($status = password_verify($data['code'], $user['two_factor_code'])) {
+							// clear old pending session
+							$session->remove('pending_2fa_user_id');
+							// create full login session
+						$session->set('id', $user['id']);
+						$session->set('name', $user['name']);
+						$session->set('email', $user['email']);
+						$session->set('username', $user['username']);
+							// clear code after successful verification
+							$this->Model->update($user['id'], [
+								'two_factor_code' => null,
+								'two_factor_expires' => null,
+								'two_factor_verified' => 1,
+							]);
+						} else {
+							$message = 'Invalid 2FA code';
+						}
+					} else {
+						$message = '2FA code expired. Please login again.';
+						$session->remove('pending_2fa_user_id');
+					}
+				} else {
+					$message = 'User not found';
+				}
+			} else {
+				$message = 'Verification code is required';
+			}
+		} else {
+			$message = 'No pending 2FA session found';
+		}
+
+		return $this->response->setJSON([
+			'success' => $status,
+			'message' => $message,
+			'data' => $data,
+		])->setStatusCode($status ? 200 : 400);
+	}
+
+	public function resendTwoFactorCode() {
+		// define variables
+		$status = false;
+		$message = null;
+
+		// get userid from session
+		$session = \Config\Services::session();
+		$userId = $session->get('pending_2fa_user_id');
+
+		// check if userId is set and valid
+		if ($status = isset($userId) && !empty($userId) && is_numeric($userId)) {
+			// find user by id 
+			$user =$this->Model->find($userId);
+
+			// check if user is found and array 
+			if ($status = isset($user) && is_array($user) && count($user) > 0) {
+				// send 2FA code to email
+				if ($status = $this->twoFactorEmail($user['email'])) {
+					$message = '2FA code resent successfully';
+				} else {
+					$message = 'Failed to resend 2FA code';
+				}
+			} else {
+				$message = 'User not found';
+
+			}
+		} else {
+			$message = 'No pending 2FA session found';
+		}
+
+		return $this->response->setJSON([
+			'success' => $status,
+			'message' => $message,
+		])->setStatusCode($status ? 200 : 400);
 	}
 }

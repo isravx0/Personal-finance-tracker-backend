@@ -124,3 +124,6 @@ _modules/*
 
 /results/
 /phpunit*.xml
+
+# Ignore node_modules and vendor directories, as they can be very large and are not meant to be under version control.
+/vendor/
